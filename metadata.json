@@ -1,0 +1,6 @@
+{
+  "name": "P Habits",
+  "description": "A powerful offline habit tracker inspired by Loop with week/month views, streaks, analytics, and custom styles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
