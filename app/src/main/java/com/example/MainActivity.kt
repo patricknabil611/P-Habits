@@ -1,5 +1,6 @@
 package com.example
 
+import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -27,15 +28,21 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.auth.AuthManager
+import com.example.data.model.Habit
 import com.example.ui.HabitViewModel
 import com.example.ui.details.HabitDetailsScreen
 import com.example.ui.editor.HabitEditorDialog
@@ -58,8 +65,14 @@ enum class MainTab(
 }
 
 class MainActivity : ComponentActivity() {
+
+    private lateinit var authManager: AuthManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        authManager = AuthManager(this)
+        authManager.attemptAutoSignIn(lifecycleScope)
+
         enableEdgeToEdge()
         setContent {
             val viewModel: HabitViewModel = viewModel()
@@ -70,24 +83,35 @@ class MainActivity : ComponentActivity() {
                 dynamicColor = settings.dynamicColor,
                 accentHex = settings.accentColor
             ) {
-                MainApp(viewModel = viewModel)
+                MainApp(viewModel = viewModel, authManager = authManager)
             }
         }
     }
 }
 
 @Composable
-fun MainApp(viewModel: HabitViewModel) {
+fun MainApp(
+    viewModel: HabitViewModel,
+    authManager: AuthManager
+) {
+    val context = LocalContext.current
+    val activity = context as? Activity
+    val scope = rememberCoroutineScope()
+
     val allHabits by viewModel.allHabits.collectAsStateWithLifecycle()
     val activeHabits by viewModel.activeHabits.collectAsStateWithLifecycle()
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val settings by viewModel.settings.collectAsStateWithLifecycle()
+
+    val currentUser by authManager.currentUser.collectAsStateWithLifecycle()
+    val isLoadingAuth by authManager.isLoading.collectAsStateWithLifecycle()
 
     val habitsToDisplay = if (settings.showArchived) allHabits else activeHabits
 
     var currentTab by remember { mutableStateOf(MainTab.WEEK) }
     var selectedHabitIdForDetails by remember { mutableStateOf<Long?>(null) }
     var showCreateHabitDialog by remember { mutableStateOf(false) }
+    var editingHabit by remember { mutableStateOf<Habit?>(null) }
 
     // Handle back button when on habit details screen
     if (selectedHabitIdForDetails != null) {
@@ -153,7 +177,8 @@ fun MainApp(viewModel: HabitViewModel) {
                             onOpenHabitDetails = { id -> selectedHabitIdForDetails = id },
                             onAddNewHabit = { showCreateHabitDialog = true },
                             onReorderHabits = { reordered -> viewModel.reorderHabits(reordered) },
-                            onLoadSampleData = { viewModel.reloadSampleData() }
+                            onLoadSampleData = { viewModel.reloadSampleData() },
+                            onEditHabit = { habit -> editingHabit = habit }
                         )
 
                         MainTab.MONTH -> MonthScreen(
@@ -176,6 +201,16 @@ fun MainApp(viewModel: HabitViewModel) {
                             settings = settings,
                             habits = allHabits,
                             entries = entries,
+                            currentUser = currentUser,
+                            isLoadingAuth = isLoadingAuth,
+                            onSignInWithGoogle = {
+                                if (activity != null) {
+                                    authManager.signInWithGoogle(activity, scope)
+                                }
+                            },
+                            onSignOut = {
+                                authManager.signOut(scope)
+                            },
                             onUpdateSettings = { updated -> viewModel.updateSettings(updated) },
                             onReloadSampleData = { viewModel.reloadSampleData() },
                             onClearAllData = { viewModel.clearAllData() },
@@ -194,6 +229,25 @@ fun MainApp(viewModel: HabitViewModel) {
             onSaveHabit = { newHabit ->
                 viewModel.saveHabit(newHabit)
                 showCreateHabitDialog = false
+            }
+        )
+    }
+
+    if (editingHabit != null) {
+        HabitEditorDialog(
+            initialHabit = editingHabit,
+            onDismiss = { editingHabit = null },
+            onSaveHabit = { updatedHabit ->
+                viewModel.saveHabit(updatedHabit)
+                editingHabit = null
+            },
+            onDeleteHabit = { id ->
+                viewModel.deleteHabit(id)
+                editingHabit = null
+            },
+            onToggleArchive = { id, archived ->
+                viewModel.toggleArchive(id, archived)
+                editingHabit = null
             }
         )
     }

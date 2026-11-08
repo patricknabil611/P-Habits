@@ -82,6 +82,10 @@ fun SettingsScreen(
     settings: UserSettings,
     habits: List<Habit>,
     entries: List<HabitEntry>,
+    currentUser: com.google.firebase.auth.FirebaseUser?,
+    isLoadingAuth: Boolean,
+    onSignInWithGoogle: () -> Unit,
+    onSignOut: () -> Unit,
     onUpdateSettings: (UserSettings) -> Unit,
     onReloadSampleData: () -> Unit,
     onClearAllData: () -> Unit,
@@ -111,6 +115,93 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Account & Google Sign-In Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (currentUser != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val initialLetter = currentUser?.displayName?.take(1)?.uppercase()
+                        ?: currentUser?.email?.take(1)?.uppercase()
+                        ?: "G"
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = initialLetter,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (currentUser != null) {
+                            Text(
+                                text = currentUser.displayName ?: "Google User",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = currentUser.email ?: "Signed in",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            Text(
+                                text = "Google Account",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Sync habits & backup to cloud",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    if (currentUser != null) {
+                        OutlinedButton(
+                            onClick = onSignOut,
+                            modifier = Modifier.testTag("google_sign_out_button")
+                        ) {
+                            Text("Sign Out")
+                        }
+                    } else {
+                        Button(
+                            onClick = onSignInWithGoogle,
+                            enabled = !isLoadingAuth,
+                            modifier = Modifier.testTag("google_login_button")
+                        ) {
+                            if (isLoadingAuth) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Sign In")
+                            }
+                        }
+                    }
+                }
+            }
+
             // Live Preview Card
             Text(
                 text = "Live Appearance Preview",

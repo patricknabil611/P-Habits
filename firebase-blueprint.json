@@ -1,0 +1,48 @@
+{
+  "entities": {
+    "User": {
+      "path": "users/{userId}",
+      "fields": {
+        "userId": { "type": "string", "description": "Authenticated user UID" },
+        "email": { "type": "string", "description": "Google user email" },
+        "displayName": { "type": "string", "description": "Google user display name" },
+        "photoUrl": { "type": "string", "description": "Profile picture URL" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" }
+      }
+    },
+    "Habit": {
+      "path": "users/{userId}/habits/{habitId}",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "name": { "type": "string", "description": "Habit name" },
+        "description": { "type": "string", "description": "Habit description/question" },
+        "type": { "type": "string", "description": "YES_NO or COUNT" },
+        "target": { "type": "number", "description": "Daily target" },
+        "unit": { "type": "string", "description": "Measurement unit" },
+        "colorHex": { "type": "string", "description": "Hex color string" },
+        "iconName": { "type": "string", "description": "Icon identifier" },
+        "frequencyType": { "type": "string", "description": "Frequency type" },
+        "frequencyDays": { "type": "string", "description": "Comma-separated days" },
+        "frequencyTarget": { "type": "number", "description": "Target per week/month" },
+        "reminderEnabled": { "type": "boolean", "description": "Reminder toggle" },
+        "reminderHour": { "type": "number", "description": "Reminder hour" },
+        "reminderMinute": { "type": "number", "description": "Reminder minute" },
+        "reminderDays": { "type": "string", "description": "Reminder days" },
+        "orderIndex": { "type": "number", "description": "Display order index" },
+        "isArchived": { "type": "boolean", "description": "Archive status" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" }
+      }
+    },
+    "HabitEntry": {
+      "path": "users/{userId}/habit_entries/{entryId}",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "habitId": { "type": "number", "description": "Associated habit ID" },
+        "dateString": { "type": "string", "description": "Date YYYY-MM-DD" },
+        "value": { "type": "number", "description": "Logged value" },
+        "notes": { "type": "string", "description": "Notes" },
+        "timestamp": { "type": "timestamp", "description": "Logged timestamp" }
+      }
+    }
+  }
+}

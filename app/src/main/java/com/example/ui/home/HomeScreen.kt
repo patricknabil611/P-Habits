@@ -1,11 +1,14 @@
 package com.example.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -81,6 +84,7 @@ fun HomeScreen(
     onAddNewHabit: () -> Unit,
     onReorderHabits: (List<Habit>) -> Unit,
     onLoadSampleData: () -> Unit,
+    onEditHabit: (Habit) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -103,15 +107,30 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = "P Habits",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        // Week range subtitle chip
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        // Week range subtitle chip with navigation arrows: < [Nov 1 - Nov 7] >
                         val weekStartStr = currentWeekDays.first().format(DateTimeFormatter.ofPattern("MMM d"))
                         val weekEndStr = currentWeekDays.last().format(DateTimeFormatter.ofPattern("MMM d"))
+
+                        IconButton(
+                            onClick = { anchorDate = anchorDate.minusWeeks(1) },
+                            modifier = Modifier.size(32.dp).testTag("prev_week_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBackIosNew,
+                                contentDescription = "Previous week",
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
@@ -121,6 +140,17 @@ fun HomeScreen(
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { anchorDate = anchorDate.plusWeeks(1) },
+                            modifier = Modifier.size(32.dp).testTag("next_week_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowForwardIos,
+                                contentDescription = "Next week",
+                                modifier = Modifier.size(13.dp)
                             )
                         }
                     }
@@ -170,12 +200,10 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Week Navigator Header with prev/next arrows and 7 days columns
+            // Week Navigator Header
             WeekHeaderRow(
                 weekDays = currentWeekDays,
                 today = today,
-                onPrevWeek = { anchorDate = anchorDate.minusWeeks(1) },
-                onNextWeek = { anchorDate = anchorDate.plusWeeks(1) },
                 settings = settings
             )
 
@@ -228,9 +256,11 @@ fun HomeScreen(
                     }
                 }
             } else {
-                // List of habit rows
+                // List of habit rows with consistent 12dp spacing and bottom padding for FAB
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 104.dp)
                 ) {
                     itemsIndexed(habits, key = { _, h -> h.id }) { index, habit ->
                         val habitEntries = remember(entries, habit.id) {
@@ -268,6 +298,7 @@ fun HomeScreen(
                                 }
                             },
                             onHabitClick = { onOpenHabitDetails(habit.id) },
+                            onEditHabit = onEditHabit,
                             onCellClick = { date ->
                                 val dateStr = DateUtils.toDateString(date)
                                 if (habit.isCountType) {
@@ -315,8 +346,6 @@ fun HomeScreen(
 fun WeekHeaderRow(
     weekDays: List<LocalDate>,
     today: LocalDate,
-    onPrevWeek: () -> Unit,
-    onNextWeek: () -> Unit,
     settings: UserSettings,
     modifier: Modifier = Modifier
 ) {
@@ -328,26 +357,17 @@ fun WeekHeaderRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Previous week button
-            IconButton(
-                onClick = onPrevWeek,
-                modifier = Modifier.size(36.dp).testTag("prev_week_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBackIosNew,
-                    contentDescription = "Previous week",
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+            // Empty leading column matching the 56dp habit icon column
+            Box(modifier = Modifier.width(56.dp))
 
-            // Left title placeholder spacer aligned with habit names
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // 7 Days header columns
+            // 7 Days header columns sharing remaining width equally
             Row(
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -356,52 +376,46 @@ fun WeekHeaderRow(
                     val dayName = date.format(DateTimeFormatter.ofPattern("EE")).take(2)
                     val dayNum = date.dayOfMonth.toString()
 
-                    Column(
-                        modifier = Modifier
-                            .width(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                if (isToday) MaterialTheme.colorScheme.primaryContainer
-                                else Color.Transparent
-                            )
-                            .padding(vertical = 4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = dayName,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 10.sp,
-                                fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = dayNum,
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontSize = 12.sp,
-                                fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Normal
-                            ),
-                            color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                        )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (isToday) MaterialTheme.colorScheme.primaryContainer
+                                    else Color.Transparent
+                                )
+                                .padding(vertical = 4.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = dayName,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = dayNum,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isToday) FontWeight.ExtraBold else FontWeight.Normal
+                                ),
+                                color = if (isToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
-            }
-
-            // Next week button
-            IconButton(
-                onClick = onNextWeek,
-                modifier = Modifier.size(36.dp).testTag("next_week_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowForwardIos,
-                    contentDescription = "Next week",
-                    modifier = Modifier.size(16.dp)
-                )
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HabitRow(
     habit: Habit,
@@ -414,6 +428,7 @@ fun HabitRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onHabitClick: () -> Unit,
+    onEditHabit: (Habit) -> Unit,
     onCellClick: (LocalDate) -> Unit,
     onCellLongClick: (LocalDate) -> Unit,
     modifier: Modifier = Modifier
@@ -423,89 +438,73 @@ fun HabitRow(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable(onClick = onHabitClick),
+            .combinedClickable(
+                onClick = onHabitClick,
+                onLongClick = { onEditHabit(habit) }
+            ),
         color = MaterialTheme.colorScheme.surface
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 9.dp),
+                .padding(horizontal = 16.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Reorder controls if reorder mode is active
-            AnimatedVisibility(visible = isReorderMode) {
-                Row(modifier = Modifier.padding(end = 4.dp)) {
-                    IconButton(onClick = onMoveUp, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move Up")
-                    }
-                    IconButton(onClick = onMoveDown, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move Down")
-                    }
-                }
-            }
-
-            // Habit Icon with color background
+            // Leading 56dp column: habit icon (or reorder arrows when in reorder mode)
             Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .clip(CircleShape)
-                    .background(habitColor.copy(alpha = 0.2f)),
+                modifier = Modifier.width(56.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = getHabitIcon(habit.iconName),
-                    contentDescription = null,
-                    tint = habitColor,
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            // Habit Name & Streak column
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = habit.name,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (settings.showStreaksOnHome && streak > 0) {
-                        Icon(
-                            imageVector = Icons.Default.LocalFireDepartment,
-                            contentDescription = "Streak",
-                            tint = Color(0xFFFF9800),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = "${streak}d",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFF9800)
+                if (isReorderMode) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        IconButton(
+                            onClick = onMoveUp,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowUp,
+                                contentDescription = "Move Up",
+                                modifier = Modifier.size(18.dp)
                             )
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        IconButton(
+                            onClick = onMoveDown,
+                            modifier = Modifier.size(24.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Move Down",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
-
-                    if (habit.isCountType) {
-                        Text(
-                            text = "${habit.target.toInt()} ${habit.unit}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(habitColor.copy(alpha = 0.2f))
+                            .clickable { onEditHabit(habit) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = getHabitIcon(habit.iconName),
+                            contentDescription = "Edit ${habit.name}",
+                            tint = habitColor,
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // 7 Days Cells
+            // 7 Days Cells sharing remaining width equally
             Row(
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -521,13 +520,11 @@ fun HabitRow(
                         isToday = date == today,
                         settings = settings,
                         onClick = { onCellClick(date) },
-                        onLongClick = { onCellLongClick(date) }
+                        onLongClick = { onCellLongClick(date) },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
-
-            // Right spacer matching arrow buttons in header
-            Spacer(modifier = Modifier.width(36.dp))
         }
     }
 }

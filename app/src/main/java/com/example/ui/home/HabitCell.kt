@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -81,7 +82,7 @@ fun HabitCell(
 
     Box(
         modifier = modifier
-            .size(cellDimension)
+            .aspectRatio(1f)
             .clip(shape)
             .then(
                 if (isCompleted) {
@@ -126,7 +127,7 @@ fun HabitCell(
             // Count Habit display
             if (settings.countDisplayStyle == "PROGRESS_RING") {
                 // Circular progress ring inside cell
-                Canvas(modifier = Modifier.fillMaxSize().size(cellDimension)) {
+                Canvas(modifier = Modifier.fillMaxSize()) {
                     val strokeW = 3.dp.toPx()
                     val radius = (size.minDimension - strokeW) / 2
                     val center = Offset(size.width / 2, size.height / 2)
