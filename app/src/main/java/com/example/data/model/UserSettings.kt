@@ -23,5 +23,8 @@ data class UserSettings(
     val is24HourTime: Boolean = true,
     val showStreaksOnHome: Boolean = true,
     val showArchived: Boolean = false,
-    val customColorPalette: String = "#10B981,#3B82F6,#8B5CF6,#EC4899,#F59E0B,#EF4444,#06B6D4,#84CC16,#6366F1,#F97316"
+    val customColorPalette: String = "#10B981,#3B82F6,#8B5CF6,#EC4899,#F59E0B,#EF4444,#06B6D4,#84CC16,#6366F1,#F97316",
+    val autoBackupEnabled: Boolean = false,
+    val lastBackupTimestamp: Long = 0L,
+    val updatedAt: Long = System.currentTimeMillis()
 )

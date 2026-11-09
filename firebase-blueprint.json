@@ -14,6 +14,7 @@
       "path": "users/{userId}/habits/{habitId}",
       "fields": {
         "userId": { "type": "string", "description": "Owner user ID" },
+        "uuid": { "type": "string", "description": "Global unique identifier" },
         "name": { "type": "string", "description": "Habit name" },
         "description": { "type": "string", "description": "Habit description/question" },
         "type": { "type": "string", "description": "YES_NO or COUNT" },
@@ -30,18 +31,45 @@
         "reminderDays": { "type": "string", "description": "Reminder days" },
         "orderIndex": { "type": "number", "description": "Display order index" },
         "isArchived": { "type": "boolean", "description": "Archive status" },
-        "createdAt": { "type": "timestamp", "description": "Creation timestamp" }
+        "isDeleted": { "type": "boolean", "description": "Soft delete status" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Update timestamp" }
       }
     },
     "HabitEntry": {
       "path": "users/{userId}/habit_entries/{entryId}",
       "fields": {
         "userId": { "type": "string", "description": "Owner user ID" },
-        "habitId": { "type": "number", "description": "Associated habit ID" },
+        "uuid": { "type": "string", "description": "Global unique identifier" },
+        "habitUuid": { "type": "string", "description": "Associated habit global UUID" },
+        "habitId": { "type": "number", "description": "Associated habit local ID" },
         "dateString": { "type": "string", "description": "Date YYYY-MM-DD" },
         "value": { "type": "number", "description": "Logged value" },
         "notes": { "type": "string", "description": "Notes" },
-        "timestamp": { "type": "timestamp", "description": "Logged timestamp" }
+        "timestamp": { "type": "timestamp", "description": "Logged timestamp" },
+        "updatedAt": { "type": "timestamp", "description": "Update timestamp" },
+        "isDeleted": { "type": "boolean", "description": "Soft delete status" }
+      }
+    },
+    "Settings": {
+      "path": "users/{userId}/settings/{settingsId}",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "themeMode": { "type": "string", "description": "Theme mode" },
+        "dynamicColor": { "type": "boolean", "description": "Dynamic color toggle" },
+        "accentColor": { "type": "string", "description": "Hex accent color" },
+        "updatedAt": { "type": "timestamp", "description": "Update timestamp" }
+      }
+    },
+    "Backup": {
+      "path": "users/{userId}/backups/{backupId}",
+      "fields": {
+        "userId": { "type": "string", "description": "Owner user ID" },
+        "name": { "type": "string", "description": "Backup file name" },
+        "createdAt": { "type": "timestamp", "description": "Creation timestamp" },
+        "habitCount": { "type": "number", "description": "Number of habits" },
+        "entryCount": { "type": "number", "description": "Number of check-in entries" },
+        "jsonData": { "type": "string", "description": "Full JSON backup data" }
       }
     }
   }

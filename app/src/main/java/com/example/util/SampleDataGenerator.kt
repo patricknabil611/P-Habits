@@ -14,6 +14,7 @@ object SampleDataGenerator {
         return listOf(
             Habit(
                 id = 1L,
+                uuid = "sample-habit-1",
                 name = "Morning Meditation",
                 description = "Mindful breathing and stillness for 10 min",
                 type = HabitType.YES_NO.name,
@@ -28,10 +29,12 @@ object SampleDataGenerator {
                 reminderHour = 7,
                 reminderMinute = 30,
                 orderIndex = 0,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             ),
             Habit(
                 id = 2L,
+                uuid = "sample-habit-2",
                 name = "Drink Water",
                 description = "Stay hydrated throughout the day",
                 type = HabitType.COUNT.name,
@@ -46,10 +49,12 @@ object SampleDataGenerator {
                 reminderHour = 9,
                 reminderMinute = 0,
                 orderIndex = 1,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             ),
             Habit(
                 id = 3L,
+                uuid = "sample-habit-3",
                 name = "Read Books",
                 description = "Expand knowledge and focus",
                 type = HabitType.COUNT.name,
@@ -64,10 +69,12 @@ object SampleDataGenerator {
                 reminderHour = 21,
                 reminderMinute = 0,
                 orderIndex = 2,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             ),
             Habit(
                 id = 4L,
+                uuid = "sample-habit-4",
                 name = "Strength Workout",
                 description = "Gym or bodyweight training session",
                 type = HabitType.YES_NO.name,
@@ -82,10 +89,12 @@ object SampleDataGenerator {
                 reminderHour = 17,
                 reminderMinute = 30,
                 orderIndex = 3,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             ),
             Habit(
                 id = 5L,
+                uuid = "sample-habit-5",
                 name = "Evening Walk",
                 description = "Brisk outdoor steps before dinner",
                 type = HabitType.COUNT.name,
@@ -100,10 +109,12 @@ object SampleDataGenerator {
                 reminderHour = 19,
                 reminderMinute = 0,
                 orderIndex = 4,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             ),
             Habit(
                 id = 6L,
+                uuid = "sample-habit-6",
                 name = "Code & Learn",
                 description = "Kotlin / Compose architecture practice",
                 type = HabitType.YES_NO.name,
@@ -118,7 +129,8 @@ object SampleDataGenerator {
                 reminderHour = 20,
                 reminderMinute = 0,
                 orderIndex = 5,
-                createdAt = now - 60L * 86400000L
+                createdAt = now - 60L * 86400000L,
+                updatedAt = now - 60L * 86400000L
             )
         )
     }
@@ -157,6 +169,7 @@ object SampleDataGenerator {
                     entries.add(
                         HabitEntry(
                             habitId = habit.id,
+                            habitUuid = habit.uuid,
                             dateString = DateUtils.toDateString(date),
                             value = entryValue
                         )
@@ -172,6 +185,7 @@ object SampleDataGenerator {
                         entries.add(
                             HabitEntry(
                                 habitId = habit.id,
+                                habitUuid = habit.uuid,
                                 dateString = DateUtils.toDateString(date),
                                 value = partial
                             )

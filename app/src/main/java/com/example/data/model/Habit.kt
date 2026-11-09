@@ -2,6 +2,7 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 enum class HabitType {
     YES_NO,
@@ -19,6 +20,7 @@ enum class FrequencyType {
 data class Habit(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
+    val uuid: String = UUID.randomUUID().toString(),
     val name: String,
     val description: String = "",
     val type: String = HabitType.YES_NO.name,
@@ -35,7 +37,9 @@ data class Habit(
     val reminderDays: String = "1,2,3,4,5,6,7",
     val orderIndex: Int = 0,
     val isArchived: Boolean = false,
-    val createdAt: Long = System.currentTimeMillis()
+    val isDeleted: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 ) {
     val isCountType: Boolean get() = type == HabitType.COUNT.name
 
