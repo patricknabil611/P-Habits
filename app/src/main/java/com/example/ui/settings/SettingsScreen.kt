@@ -68,13 +68,18 @@ import com.example.data.model.Habit
 import com.example.data.model.HabitEntry
 import com.example.data.model.HabitType
 import com.example.data.model.UserSettings
+import com.example.sync.BackupItem
+import com.example.sync.SyncStatus
 import com.example.ui.home.HabitCell
 import com.example.ui.theme.DefaultHabitPalette
 import com.example.ui.theme.parseHexColor
 import com.example.util.BackupExportUtil
 import com.example.util.DateUtils
 import com.example.util.NotificationHelper
+import java.text.SimpleDateFormat
 import java.time.LocalDate
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -84,20 +89,34 @@ fun SettingsScreen(
     entries: List<HabitEntry>,
     currentUser: com.google.firebase.auth.FirebaseUser?,
     isLoadingAuth: Boolean,
+    syncStatus: SyncStatus = SyncStatus.DISABLED,
+    lastSyncTime: Long = 0L,
+    syncErrorMessage: String? = null,
+    onTriggerSync: () -> Unit = {},
+    onBackupNow: () -> Unit = {},
+    onListBackups: ((List<BackupItem>) -> Unit) -> Unit = {},
+    onRestoreCloudBackup: (BackupItem) -> Unit = {},
     onSignInWithGoogle: () -> Unit,
-    onSignOut: () -> Unit,
+    onSignOutWithChoice: (removeLocalData: Boolean) -> Unit,
     onUpdateSettings: (UserSettings) -> Unit,
     onReloadSampleData: () -> Unit,
     onClearAllData: () -> Unit,
     onRestoreBackup: (List<Habit>, List<HabitEntry>) -> Unit,
+    isBackingUp: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showClearConfirmDialog by remember { mutableStateOf(false) }
+    var showSignOutConfirmDialog by remember { mutableStateOf(false) }
+    var showBackupsListDialog by remember { mutableStateOf(false) }
+    var availableBackups by remember { mutableStateOf<List<BackupItem>>(emptyList()) }
+    var isLoadingBackups by remember { mutableStateOf(false) }
+    var backupToRestore by remember { mutableStateOf<BackupItem?>(null) }
     var showImportDialog by remember { mutableStateOf(false) }
     var importJsonText by remember { mutableStateOf("") }
     var importError by remember { mutableStateOf<String?>(null) }
     var showTestNotificationSent by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -124,79 +143,275 @@ fun SettingsScreen(
                     else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
                 )
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val initialLetter = currentUser?.displayName?.take(1)?.uppercase()
-                        ?: currentUser?.email?.take(1)?.uppercase()
-                        ?: "G"
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                        contentAlignment = Alignment.Center
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = initialLetter,
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimary
+                        val initialLetter = currentUser?.displayName?.take(1)?.uppercase()
+                            ?: currentUser?.email?.take(1)?.uppercase()
+                            ?: "G"
+                        Box(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = initialLetter,
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
                             )
-                        )
-                    }
+                        }
 
-                    Spacer(modifier = Modifier.width(14.dp))
+                        Spacer(modifier = Modifier.width(14.dp))
 
-                    Column(modifier = Modifier.weight(1f)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (currentUser != null) {
+                                Text(
+                                    text = currentUser.displayName ?: "Google User",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = currentUser.email ?: "Signed in",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    text = "Google Account",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "Sync habits & backup to cloud",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
                         if (currentUser != null) {
-                            Text(
-                                text = currentUser.displayName ?: "Google User",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Text(
-                                text = currentUser.email ?: "Signed in",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            OutlinedButton(
+                                onClick = { showSignOutConfirmDialog = true },
+                                modifier = Modifier.testTag("google_sign_out_button")
+                            ) {
+                                Text("Sign Out")
+                            }
                         } else {
-                            Text(
-                                text = "Google Account",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                            )
-                            Text(
-                                text = "Sync habits & backup to cloud",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Button(
+                                onClick = onSignInWithGoogle,
+                                enabled = !isLoadingAuth,
+                                modifier = Modifier.testTag("google_login_button")
+                            ) {
+                                if (isLoadingAuth) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text("Sign In")
+                                }
+                            }
                         }
                     }
 
                     if (currentUser != null) {
-                        OutlinedButton(
-                            onClick = onSignOut,
-                            modifier = Modifier.testTag("google_sign_out_button")
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Sync Status Indicator
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Sign Out")
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                when (syncStatus) {
+                                    SyncStatus.SYNCED -> {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Synced",
+                                            tint = Color(0xFF10B981),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        val timeStr = if (lastSyncTime > 0L) {
+                                            SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(lastSyncTime))
+                                        } else "Just now"
+                                        Text(
+                                            text = "Synced ($timeStr)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFF10B981),
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                    SyncStatus.SYNCING -> {
+                                        androidx.compose.material3.CircularProgressIndicator(
+                                            modifier = Modifier.size(14.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Syncing with cloud...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    SyncStatus.OFFLINE -> {
+                                        Icon(
+                                            imageVector = Icons.Default.CloudDownload,
+                                            contentDescription = "Offline",
+                                            tint = Color(0xFFF59E0B),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "Offline (changes saved locally)",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFFF59E0B)
+                                        )
+                                    }
+                                    SyncStatus.ERROR -> {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Error",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = syncErrorMessage ?: "Sync error",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.error,
+                                            maxLines = 1
+                                        )
+                                    }
+                                    SyncStatus.DISABLED -> {
+                                        Text(
+                                            text = "Cloud sync disabled",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+
+                            TextButton(
+                                onClick = onTriggerSync,
+                                enabled = syncStatus != SyncStatus.SYNCING,
+                                modifier = Modifier.testTag("manual_sync_button")
+                            ) {
+                                Text("Sync Now", style = MaterialTheme.typography.labelMedium)
+                            }
                         }
-                    } else {
+                    }
+                }
+            }
+
+            // Google Drive & Cloud Backup Card
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.CloudUpload,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Google Drive & Cloud Backup",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val lastBackupStr = if (settings.lastBackupTimestamp > 0L) {
+                        SimpleDateFormat("MMM d, yyyy h:mm a", Locale.getDefault()).format(Date(settings.lastBackupTimestamp))
+                    } else "Never backed up"
+                    Text(
+                        text = "Last successful backup: $lastBackupStr",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Daily auto backup toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            Text("Automatic Daily Backup", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium))
+                            Text("Saves snapshot every 24h (keeps last 7 backups)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = settings.autoBackupEnabled,
+                            onCheckedChange = { onUpdateSettings(settings.copy(autoBackupEnabled = it)) },
+                            modifier = Modifier.testTag("auto_backup_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         Button(
-                            onClick = onSignInWithGoogle,
-                            enabled = !isLoadingAuth,
-                            modifier = Modifier.testTag("google_login_button")
+                            onClick = onBackupNow,
+                            enabled = !isBackingUp && currentUser != null,
+                            modifier = Modifier.weight(1f).testTag("backup_now_button")
                         ) {
-                            if (isLoadingAuth) {
+                            if (isBackingUp) {
                                 androidx.compose.material3.CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
+                                    modifier = Modifier.size(16.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Backing up...")
                             } else {
-                                Text("Sign In")
+                                Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Back Up Now")
                             }
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (currentUser != null) {
+                                    isLoadingBackups = true
+                                    onListBackups { list ->
+                                        availableBackups = list
+                                        isLoadingBackups = false
+                                        showBackupsListDialog = true
+                                    }
+                                } else {
+                                    statusMessage = "Please sign in with Google to view cloud backups."
+                                }
+                            },
+                            modifier = Modifier.weight(1f).testTag("restore_cloud_backup_button")
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Restore")
                         }
                     }
                 }
@@ -740,6 +955,136 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showImportDialog = false }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showSignOutConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutConfirmDialog = false },
+            title = { Text("Sign Out from Google Account") },
+            text = { Text("Do you want to keep your habit data on this device or remove it?\n\nYour data remains safely stored in your Google cloud account either way.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSignOutConfirmDialog = false
+                        onSignOutWithChoice(false)
+                    }
+                ) {
+                    Text("Keep on Device")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { showSignOutConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
+                    Button(
+                        onClick = {
+                            showSignOutConfirmDialog = false
+                            onSignOutWithChoice(true)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text("Remove from Device")
+                    }
+                }
+            }
+        )
+    }
+
+    if (showBackupsListDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackupsListDialog = false },
+            title = { Text("Available Backups") },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (isLoadingBackups) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.CircularProgressIndicator()
+                        }
+                    } else if (availableBackups.isEmpty()) {
+                        Text("No backups found yet. Tap 'Back Up Now' to create one.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.fillMaxWidth().height(260.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(availableBackups.size) { idx ->
+                                val backup = availableBackups[idx]
+                                val dateStr = SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()).format(Date(backup.timestamp))
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(dateStr, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                                            Text("${backup.habitCount} habits • ${backup.entryCount} check-ins", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        Button(
+                                            onClick = { backupToRestore = backup },
+                                            modifier = Modifier.testTag("restore_backup_item_${backup.id}")
+                                        ) {
+                                            Text("Restore")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showBackupsListDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    if (backupToRestore != null) {
+        val b = backupToRestore!!
+        val dateStr = SimpleDateFormat("MMM d, yyyy  h:mm a", Locale.getDefault()).format(Date(b.timestamp))
+        AlertDialog(
+            onDismissRequest = { backupToRestore = null },
+            title = { Text("Confirm Restore") },
+            text = {
+                Text("Restore backup from $dateStr?\n\nThis will replace current local habits with ${b.habitCount} habits and ${b.entryCount} check-ins.\n\nSAFETY: A local emergency backup of your current habits will be created automatically before restoring.")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRestoreCloudBackup(b)
+                        backupToRestore = null
+                        showBackupsListDialog = false
+                    }
+                ) {
+                    Text("Confirm Restore")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { backupToRestore = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (statusMessage != null) {
+        AlertDialog(
+            onDismissRequest = { statusMessage = null },
+            title = { Text("Notice") },
+            text = { Text(statusMessage!!) },
+            confirmButton = {
+                TextButton(onClick = { statusMessage = null }) {
+                    Text("OK")
                 }
             }
         )

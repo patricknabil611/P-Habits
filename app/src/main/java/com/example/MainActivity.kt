@@ -10,19 +10,28 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CalendarViewWeek
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CalendarViewWeek
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -34,10 +43,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -98,6 +110,7 @@ fun MainApp(
     val activity = context as? Activity
     val scope = rememberCoroutineScope()
 
+    val isLoadingData by viewModel.isLoadingData.collectAsStateWithLifecycle()
     val allHabits by viewModel.allHabits.collectAsStateWithLifecycle()
     val activeHabits by viewModel.activeHabits.collectAsStateWithLifecycle()
     val entries by viewModel.entries.collectAsStateWithLifecycle()
@@ -105,6 +118,54 @@ fun MainApp(
 
     val currentUser by authManager.currentUser.collectAsStateWithLifecycle()
     val isLoadingAuth by authManager.isLoading.collectAsStateWithLifecycle()
+
+    val syncStatus by viewModel.syncStatus.collectAsStateWithLifecycle()
+    val lastSyncTime by viewModel.lastSyncTime.collectAsStateWithLifecycle()
+    val syncErrorMessage by viewModel.syncErrorMessage.collectAsStateWithLifecycle()
+    var isBackingUp by remember { mutableStateOf(false) }
+
+    LaunchedEffect(currentUser?.uid) {
+        viewModel.onUserChanged(currentUser?.uid)
+    }
+
+    if (isLoadingData) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(64.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "P Habits",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Loading your habits...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                CircularProgressIndicator(
+                    modifier = Modifier.size(32.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    strokeWidth = 3.dp
+                )
+            }
+        }
+        return
+    }
 
     val habitsToDisplay = if (settings.showArchived) allHabits else activeHabits
 
@@ -203,18 +264,50 @@ fun MainApp(
                             entries = entries,
                             currentUser = currentUser,
                             isLoadingAuth = isLoadingAuth,
+                            syncStatus = syncStatus,
+                            lastSyncTime = lastSyncTime,
+                            syncErrorMessage = syncErrorMessage,
+                            onTriggerSync = { viewModel.triggerSync() },
+                            onBackupNow = {
+                                val uid = currentUser?.uid
+                                if (uid != null) {
+                                    isBackingUp = true
+                                    viewModel.createBackup(uid) {
+                                        isBackingUp = false
+                                    }
+                                }
+                            },
+                            onListBackups = { callback ->
+                                val uid = currentUser?.uid
+                                if (uid != null) {
+                                    viewModel.listBackups(uid) { result ->
+                                        callback(result.getOrDefault(emptyList()))
+                                    }
+                                } else {
+                                    callback(emptyList())
+                                }
+                            },
+                            onRestoreCloudBackup = { backup ->
+                                viewModel.restoreCloudBackup(backup) {}
+                            },
                             onSignInWithGoogle = {
                                 if (activity != null) {
                                     authManager.signInWithGoogle(activity, scope)
                                 }
                             },
-                            onSignOut = {
-                                authManager.signOut(scope)
+                            onSignOutWithChoice = { removeLocalData ->
+                                if (removeLocalData) {
+                                    viewModel.clearAllData()
+                                }
+                                authManager.signOut(scope) {
+                                    viewModel.onUserChanged(null)
+                                }
                             },
                             onUpdateSettings = { updated -> viewModel.updateSettings(updated) },
                             onReloadSampleData = { viewModel.reloadSampleData() },
                             onClearAllData = { viewModel.clearAllData() },
-                            onRestoreBackup = { h, e -> viewModel.restoreBackup(h, e) }
+                            onRestoreBackup = { h, e -> viewModel.restoreBackup(h, e) },
+                            isBackingUp = isBackingUp
                         )
                     }
                 }
