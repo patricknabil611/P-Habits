@@ -54,6 +54,9 @@ interface HabitEntryDao {
     @Query("DELETE FROM habit_entries WHERE habitId = :habitId")
     suspend fun deleteEntriesForHabit(habitId: Long)
 
+    @Query("DELETE FROM habit_entries WHERE habitUuid LIKE 'sample-habit-%'")
+    suspend fun deleteSampleEntries()
+
     @Query("DELETE FROM habit_entries")
     suspend fun deleteAllEntries()
 }

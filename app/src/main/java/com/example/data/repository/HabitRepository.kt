@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 import java.util.UUID
 
 class HabitRepository(
+    private val context: Context,
     private val habitDao: HabitDao,
     private val habitEntryDao: HabitEntryDao,
     private val userSettingsDao: UserSettingsDao
@@ -206,6 +207,31 @@ class HabitRepository(
 
         // Mark has launched before so sample data will NEVER re-seed automatically on future launches
         prefs.edit().putBoolean("has_launched_before", true).apply()
+    }
+
+    suspend fun hasSampleData(): Boolean {
+        val habits = habitDao.getAllHabitsIncludingDeletedOnce()
+        return habits.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }
+    }
+
+    suspend fun deleteSampleData() {
+        val sampleHabits = habitDao.getAllHabitsIncludingDeletedOnce().filter { it.uuid.startsWith("sample-habit-") }
+        for (sample in sampleHabits) {
+            habitEntryDao.deleteEntriesForHabit(sample.id)
+            habitDao.deleteHabitById(sample.id)
+        }
+        habitEntryDao.deleteSampleEntries()
+        habitDao.deleteSampleHabits()
+    }
+
+    fun setAutoSyncStarted(started: Boolean) {
+        val prefs = context.getSharedPreferences("p_habits_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("auto_sync_started", started).apply()
+    }
+
+    fun isAutoSyncStarted(): Boolean {
+        val prefs = context.getSharedPreferences("p_habits_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("auto_sync_started", false)
     }
 
     suspend fun reloadSampleData() {

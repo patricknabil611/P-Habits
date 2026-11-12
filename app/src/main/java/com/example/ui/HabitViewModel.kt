@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,6 +30,7 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
     val activeHabits: StateFlow<List<Habit>>
     val entries: StateFlow<List<HabitEntry>>
     val settings: StateFlow<UserSettings>
+    val hasSampleData: StateFlow<Boolean>
 
     private val _isLoadingData = MutableStateFlow(true)
     val isLoadingData: StateFlow<Boolean> = _isLoadingData.asStateFlow()
@@ -39,7 +41,7 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         val db = AppDatabase.getDatabase(application)
-        repository = HabitRepository(db.habitDao(), db.habitEntryDao(), db.userSettingsDao())
+        repository = HabitRepository(application, db.habitDao(), db.habitEntryDao(), db.userSettingsDao())
 
         syncManager = FirestoreSyncManager(application, repository, viewModelScope)
         backupManager = CloudBackupManager(application, repository)
@@ -72,6 +74,14 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = UserSettings()
         )
 
+        hasSampleData = repository.allHabits.map { list ->
+            list.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = false
+        )
+
         viewModelScope.launch {
             try {
                 repository.seedSampleDataIfEmpty(application)
@@ -91,6 +101,8 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun triggerSync() {
+        repository.setAutoSyncStarted(true)
+        syncManager.setAutoSyncStarted(true)
         syncManager.triggerSync()
     }
 
@@ -128,11 +140,21 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
     fun saveHabit(habit: Habit) {
         viewModelScope.launch {
             if (habit.id == 0L) {
-                repository.saveHabit(habit.copy(orderIndex = allHabits.value.size))
+                // When creating the first record:
+                // 1. Delete sample data if present
+                val hadSample = repository.hasSampleData()
+                if (hadSample) {
+                    repository.deleteSampleData()
+                }
+                // 2. Activate auto-syncing
+                repository.setAutoSyncStarted(true)
+                syncManager.setAutoSyncStarted(true)
+                val nextIndex = if (hadSample) 0 else allHabits.value.size
+                repository.saveHabit(habit.copy(orderIndex = nextIndex))
             } else {
                 repository.updateHabit(habit)
             }
-            syncManager.triggerDebouncedSync()
+            syncManager.triggerSync()
         }
     }
 
@@ -168,7 +190,19 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             backupManager.createEmergencyLocalBackup("pre_sample_reload")
             repository.reloadSampleData()
-            syncManager.triggerDebouncedSync()
+            repository.setAutoSyncStarted(true)
+            syncManager.setAutoSyncStarted(true)
+            syncManager.triggerSync()
+        }
+    }
+
+    fun clearSampleData() {
+        viewModelScope.launch {
+            backupManager.createEmergencyLocalBackup("pre_clear_sample")
+            repository.deleteSampleData()
+            repository.setAutoSyncStarted(true)
+            syncManager.setAutoSyncStarted(true)
+            syncManager.triggerSync()
         }
     }
 
@@ -177,7 +211,9 @@ class HabitViewModel(application: Application) : AndroidViewModel(application) {
             // SAFETY: Always create local emergency backup before clearing
             backupManager.createEmergencyLocalBackup("pre_clear_all")
             repository.clearAllData()
-            syncManager.triggerDebouncedSync()
+            repository.setAutoSyncStarted(true)
+            syncManager.setAutoSyncStarted(true)
+            syncManager.triggerSync()
         }
     }
 

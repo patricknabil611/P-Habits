@@ -305,7 +305,13 @@ fun MainApp(
                             },
                             onUpdateSettings = { updated -> viewModel.updateSettings(updated) },
                             onReloadSampleData = { viewModel.reloadSampleData() },
-                            onClearAllData = { viewModel.clearAllData() },
+                            onClearAllData = {
+                                if (viewModel.hasSampleData.value) {
+                                    viewModel.clearSampleData()
+                                } else {
+                                    viewModel.clearAllData()
+                                }
+                            },
                             onRestoreBackup = { h, e -> viewModel.restoreBackup(h, e) },
                             isBackingUp = isBackingUp
                         )

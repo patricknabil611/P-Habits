@@ -848,8 +848,18 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp)
             ) {
+                val hasSampleData = habits.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Sample Data & Reset", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = if (hasSampleData)
+                            "Sample demo data is currently active. Creating your first habit will automatically delete all sample data and start auto-syncing. You can also clear or reset sample data here to begin auto-syncing immediately."
+                        else
+                            "Manage sample data or reset your habits. Clearing or resetting triggers auto-sync.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Row(
@@ -872,7 +882,7 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Clear All")
+                            Text(if (hasSampleData) "Clear Sample" else "Clear All")
                         }
                     }
                 }
@@ -883,10 +893,18 @@ fun SettingsScreen(
     }
 
     if (showClearConfirmDialog) {
+        val hasSample = habits.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }
         AlertDialog(
             onDismissRequest = { showClearConfirmDialog = false },
-            title = { Text("Clear All Habit Data?") },
-            text = { Text("This will permanently delete all your habits, records, and streak history. This cannot be undone.") },
+            title = { Text(if (hasSample) "Clear Sample Data?" else "Clear All Habit Data?") },
+            text = {
+                Text(
+                    if (hasSample)
+                        "This will delete all sample habits and records, and start auto-syncing your real data to your Google account."
+                    else
+                        "This will permanently delete all your habits, records, and streak history. This cannot be undone."
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {
@@ -895,7 +913,7 @@ fun SettingsScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Clear Everything")
+                    Text(if (hasSample) "Clear Sample Data" else "Clear Everything")
                 }
             },
             dismissButton = {

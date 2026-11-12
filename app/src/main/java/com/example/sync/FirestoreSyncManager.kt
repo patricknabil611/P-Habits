@@ -63,6 +63,20 @@ class FirestoreSyncManager(
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
     val syncErrorMessage: StateFlow<String?> = _syncErrorMessage.asStateFlow()
 
+    private val _isAutoSyncStarted = MutableStateFlow(isAutoSyncStartedFromPrefs())
+    val isAutoSyncStarted: StateFlow<Boolean> = _isAutoSyncStarted.asStateFlow()
+
+    fun setAutoSyncStarted(started: Boolean) {
+        val prefs = context.getSharedPreferences("p_habits_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("auto_sync_started", started).apply()
+        _isAutoSyncStarted.value = started
+    }
+
+    private fun isAutoSyncStartedFromPrefs(): Boolean {
+        val prefs = context.getSharedPreferences("p_habits_prefs", Context.MODE_PRIVATE)
+        return prefs.getBoolean("auto_sync_started", false)
+    }
+
     private var currentUserId: String? = null
     private var debounceJob: Job? = null
     private var isOnline = true
@@ -120,6 +134,7 @@ class FirestoreSyncManager(
 
     fun triggerDebouncedSync() {
         if (currentUserId == null) return
+        if (!_isAutoSyncStarted.value) return // Auto-sync starts after first habit created or clear/reset
         debounceJob?.cancel()
         debounceJob = scope.launch {
             delay(1500) // 1.5s debounce
@@ -149,6 +164,29 @@ class FirestoreSyncManager(
             _syncErrorMessage.value = null
 
             val userDocRef = firestore.collection("users").document(userId)
+            val habitsCol = userDocRef.collection("habits")
+
+            // If auto-sync has not started yet (initial install with sample data)
+            if (!_isAutoSyncStarted.value) {
+                // Check if user already has real habits in the cloud from another device
+                val remoteSnap = habitsCol.get().await()
+                val remoteRealHabits = remoteSnap.documents
+                    .mapNotNull { parseHabitFromDoc(it) }
+                    .filter { !it.isDeleted && !it.uuid.startsWith("sample-habit-") }
+
+                if (remoteRealHabits.isNotEmpty()) {
+                    Log.d(TAG, "User has ${remoteRealHabits.size} cloud habits. Deleting local sample data and enabling auto-sync.")
+                    repository.deleteSampleData()
+                    setAutoSyncStarted(true)
+                    repository.setAutoSyncStarted(true)
+                } else {
+                    // Do not push dummy sample habits to cloud
+                    Log.d(TAG, "Auto-sync standby: waiting for first record or clear/reset.")
+                    _lastSyncTime.value = System.currentTimeMillis()
+                    _syncStatus.value = SyncStatus.SYNCED
+                    return@withContext
+                }
+            }
 
             // Ensure user root doc exists
             userDocRef.set(
@@ -190,6 +228,14 @@ class FirestoreSyncManager(
 
         // Merge Remote -> Local
         for ((uuid, remoteHabit) in remoteHabitsMap) {
+            // Clean up any sample habits from remote if they exist
+            if (uuid.startsWith("sample-habit-")) {
+                try {
+                    habitsCol.document(uuid).delete().await()
+                } catch (_: Exception) {}
+                continue
+            }
+
             val localHabit = localHabitsMap[uuid]
             if (localHabit == null) {
                 // If remote is not deleted, insert to local
@@ -208,6 +254,11 @@ class FirestoreSyncManager(
 
         // Merge Local -> Remote
         for ((uuid, localHabit) in localHabitsMap) {
+            // Never upload sample habits to cloud
+            if (uuid.startsWith("sample-habit-")) {
+                continue
+            }
+
             val remoteHabit = remoteHabitsMap[uuid]
             if (remoteHabit == null) {
                 // Not in remote yet, upload
@@ -235,6 +286,13 @@ class FirestoreSyncManager(
 
         // Remote -> Local
         for ((uuid, remoteEntry) in remoteEntriesMap) {
+            if (remoteEntry.habitUuid.startsWith("sample-habit-") || uuid.startsWith("sample-")) {
+                try {
+                    entriesCol.document(uuid).delete().await()
+                } catch (_: Exception) {}
+                continue
+            }
+
             val localEntry = localEntriesMap[uuid]
             if (localEntry == null) {
                 if (!remoteEntry.isDeleted) {
@@ -255,6 +313,10 @@ class FirestoreSyncManager(
 
         // Local -> Remote
         for ((uuid, localEntry) in localEntriesMap) {
+            if (localEntry.habitUuid.startsWith("sample-habit-") || uuid.startsWith("sample-")) {
+                continue // Never upload sample entries to cloud
+            }
+
             val remoteEntry = remoteEntriesMap[uuid]
             if (remoteEntry == null) {
                 entriesCol.document(uuid).set(entryToMap(localEntry)).await()

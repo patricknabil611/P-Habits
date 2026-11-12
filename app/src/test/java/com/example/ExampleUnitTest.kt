@@ -92,4 +92,28 @@ class ExampleUnitTest {
         assertEquals("habit-uuid-abc", entry.habitUuid)
         assertFalse(entry.isDeleted)
     }
+
+    @Test
+    fun testSampleDataFilteringForSync() {
+        val sampleHabit = Habit(
+            id = 1L,
+            uuid = "sample-habit-1",
+            name = "Morning Meditation",
+            target = 1f
+        )
+        val userHabit = Habit(
+            id = 2L,
+            uuid = "user-custom-uuid-123",
+            name = "My Real Habit",
+            target = 2f
+        )
+        val habits = listOf(sampleHabit, userHabit)
+
+        val hasSample = habits.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }
+        assertTrue(hasSample)
+
+        val syncableHabits = habits.filter { !it.uuid.startsWith("sample-habit-") }
+        assertEquals(1, syncableHabits.size)
+        assertEquals("user-custom-uuid-123", syncableHabits.first().uuid)
+    }
 }

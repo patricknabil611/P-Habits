@@ -65,6 +65,9 @@ interface HabitDao {
     @Query("UPDATE habits SET orderIndex = :newIndex, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateOrderIndex(id: Long, newIndex: Int, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("DELETE FROM habits WHERE uuid LIKE 'sample-habit-%'")
+    suspend fun deleteSampleHabits()
+
     @Query("DELETE FROM habits")
     suspend fun deleteAllHabits()
 }
