@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -354,20 +355,16 @@ fun WeekHeaderRow(
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 2.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
         ) {
-            // Empty leading column matching the 56dp habit icon column
-            Box(modifier = Modifier.width(56.dp))
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // 7 Days header columns sharing remaining width equally
+            // 7 Days header columns sharing full row width (with 16dp horizontal padding)
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .widthIn(max = 600.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -441,28 +438,85 @@ fun HabitRow(
             .combinedClickable(
                 onClick = onHabitClick,
                 onLongClick = { onEditHabit(habit) }
-            ),
+            )
+            .testTag("habit_row_${habit.id}"),
         color = MaterialTheme.colorScheme.surface
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
         ) {
-            // Leading 56dp column: habit icon (or reorder arrows when in reorder mode)
-            Box(
-                modifier = Modifier.width(56.dp),
-                contentAlignment = Alignment.Center
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 600.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                if (isReorderMode) {
+                // Line 1: Habit icon and title on the same line
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(habitColor.copy(alpha = 0.2f))
+                            .clickable { onEditHabit(habit) }
+                            .testTag("edit_habit_icon_${habit.id}"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = getHabitIcon(habit.iconName),
+                            contentDescription = "Edit ${habit.name}",
+                            tint = habitColor,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Text(
+                    text = habit.name,
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+
+                if (!isReorderMode && settings.showStreaksOnHome && streak > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(habitColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 7.dp, vertical = 3.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = "Current streak",
+                            tint = habitColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "$streak",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = habitColor
+                        )
+                    }
+                }
+
+                if (isReorderMode) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
                             onClick = onMoveUp,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.KeyboardArrowUp,
@@ -472,7 +526,7 @@ fun HabitRow(
                         }
                         IconButton(
                             onClick = onMoveDown,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 Icons.Default.KeyboardArrowDown,
@@ -481,30 +535,14 @@ fun HabitRow(
                             )
                         }
                     }
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(habitColor.copy(alpha = 0.2f))
-                            .clickable { onEditHabit(habit) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = getHabitIcon(habit.iconName),
-                            contentDescription = "Edit ${habit.name}",
-                            tint = habitColor,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // 7 Days Cells sharing remaining width equally
+            // Line 2: 7-day selection tracker under the title & icon line
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -525,6 +563,7 @@ fun HabitRow(
                     )
                 }
             }
+        }
         }
     }
 }

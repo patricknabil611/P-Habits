@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.phabits.qvxrzt"
     minSdk = 24
     targetSdk = 36
-    versionCode = 2606261
-    versionName = "26.06.26.1"
+    versionCode = 2606262
+    versionName = "26.06.26.2"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
