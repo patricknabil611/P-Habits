@@ -11,7 +11,9 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,7 +64,7 @@ fun HabitCell(
 
     val cellDimension: Dp = when (settings.cellSize.uppercase()) {
         "COMPACT" -> 34.dp
-        "LARGE" -> 46.dp
+        "LARGE" -> 48.dp
         else -> 40.dp
     }
 
@@ -81,35 +83,41 @@ fun HabitCell(
     val isDue = habit.isFrequencyDay(date.dayOfWeek.value)
 
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(shape)
-            .then(
-                if (isCompleted) {
-                    if (settings.doneStyle == "CHECK_ICON") {
-                        Modifier
-                            .background(habitColor.copy(alpha = 0.2f))
-                            .border(2.dp, habitColor, shape)
-                    } else {
-                        Modifier.background(habitColor)
-                    }
-                } else if (hasPartial) {
-                    Modifier.background(habitColor.copy(alpha = 0.18f))
-                } else {
-                    when (settings.notDoneStyle.uppercase()) {
-                        "EMPTY" -> Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), shape)
-                        "X_MARK" -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                        else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)) // FADED
-                    }
-                }
-            )
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-            .testTag("habit_cell_${habit.id}_${date}"),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = cellDimension)
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(shape)
+                .then(
+                    if (isCompleted) {
+                        if (settings.doneStyle == "CHECK_ICON") {
+                            Modifier
+                                .background(habitColor.copy(alpha = 0.2f))
+                                .border(2.dp, habitColor, shape)
+                        } else {
+                            Modifier.background(habitColor)
+                        }
+                    } else if (hasPartial) {
+                        Modifier.background(habitColor.copy(alpha = 0.18f))
+                    } else {
+                        when (settings.notDoneStyle.uppercase()) {
+                            "EMPTY" -> Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f), shape)
+                            "X_MARK" -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
+                            else -> Modifier.background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)) // FADED
+                        }
+                    }
+                )
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                )
+                .testTag("habit_cell_${habit.id}_${date}"),
+            contentAlignment = Alignment.Center
+        ) {
         // Today outline ring if today
         if (isToday) {
             Box(
@@ -221,6 +229,7 @@ fun HabitCell(
                         .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 )
             }
+        }
         }
     }
 }

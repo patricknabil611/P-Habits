@@ -52,6 +52,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -70,14 +71,14 @@ import com.example.data.model.HabitType
 import com.example.data.model.UserSettings
 import com.example.sync.BackupItem
 import com.example.sync.SyncStatus
-import com.example.ui.home.HabitCell
+import com.example.ui.home.HabitRow
+import com.example.ui.home.WeekHeaderRow
 import com.example.ui.theme.DefaultHabitPalette
 import com.example.ui.theme.parseHexColor
 import com.example.util.BackupExportUtil
 import com.example.util.DateUtils
 import com.example.util.NotificationHelper
 import java.text.SimpleDateFormat
-import java.time.LocalDate
 import java.util.Date
 import java.util.Locale
 
@@ -131,12 +132,14 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Account & Google Sign-In Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = if (currentUser != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
@@ -319,7 +322,9 @@ fun SettingsScreen(
 
             // Google Drive & Cloud Backup Card
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -417,107 +422,150 @@ fun SettingsScreen(
                 }
             }
 
-            // Live Preview Card
-            Text(
-                text = "Live Appearance Preview",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-            )
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            // Live Preview Section (full screen width so cell size and layout match Home screen 1:1)
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    text = "Live Appearance Preview",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Exact Home screen size and layout:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            val previewToday = remember { DateUtils.today() }
+            val previewFirstDay = remember(settings.firstDayOfWeek) {
+                DateUtils.parseFirstDayOfWeek(settings.firstDayOfWeek)
+            }
+            val previewWeekDays = remember(previewToday, previewFirstDay) {
+                DateUtils.getWeekDays(previewToday, previewFirstDay)
+            }
+
+            val sampleYesNo = remember(settings.accentColor) {
+                Habit(
+                    id = 991,
+                    name = "Morning Meditation",
+                    type = HabitType.YES_NO.name,
+                    colorHex = settings.accentColor,
+                    iconName = "self_improvement",
+                    frequencyType = "SPECIFIC_DAYS",
+                    frequencyDays = "1,2,3,4,5,6"
+                )
+            }
+            val sampleCount = remember {
+                Habit(
+                    id = 992,
+                    name = "Drink Water (8 glasses)",
+                    type = HabitType.COUNT.name,
+                    target = 8f,
+                    unit = "glasses",
+                    colorHex = "#0284C7",
+                    iconName = "water_drop"
+                )
+            }
+
+            val previewValues = remember(previewWeekDays) {
+                mutableStateMapOf<String, Float>().apply {
+                    previewWeekDays.forEachIndexed { index, date ->
+                        val dateStr = DateUtils.toDateString(date)
+                        put("991_$dateStr", if (index % 3 == 1) 0f else 1f)
+                        val countVal = when {
+                            date == previewToday -> 5f
+                            index % 4 == 0 -> 8f
+                            index % 4 == 1 -> 9f
+                            index % 4 == 2 -> 3f
+                            else -> 0f
+                        }
+                        put("992_$dateStr", countVal)
+                    }
+                }
+            }
+
+            val previewEntryMap = previewValues.entries.associate { (key, value) ->
+                val parts = key.split("_", limit = 2)
+                val habitId = parts[0].toLongOrNull() ?: 0L
+                val dateStr = parts.getOrElse(1) { "" }
+                key to HabitEntry(
+                    habitId = habitId,
+                    dateString = dateStr,
+                    value = value
+                )
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Previewing home screen cells with current settings:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    WeekHeaderRow(
+                        weekDays = previewWeekDays,
+                        today = previewToday,
+                        settings = settings
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    HabitRow(
+                        habit = sampleYesNo,
+                        weekDays = previewWeekDays,
+                        today = previewToday,
+                        entryMap = previewEntryMap,
+                        streak = 5,
+                        settings = settings,
+                        isReorderMode = false,
+                        onMoveUp = {},
+                        onMoveDown = {},
+                        onHabitClick = {},
+                        onEditHabit = {},
+                        onCellClick = { date ->
+                            val key = "991_${DateUtils.toDateString(date)}"
+                            val cur = previewValues[key] ?: 0f
+                            previewValues[key] = if (cur >= 1f) 0f else 1f
+                        },
+                        onCellLongClick = {}
+                    )
+
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    val sampleYesNo = Habit(
-                        id = 991,
-                        name = "Meditation (Yes/No)",
-                        type = HabitType.YES_NO.name,
-                        colorHex = settings.accentColor
-                    )
-                    val sampleCount = Habit(
-                        id = 992,
-                        name = "Water (Count 8x)",
-                        type = HabitType.COUNT.name,
-                        target = 8f,
-                        unit = "glasses",
-                        colorHex = "#0284C7"
-                    )
-
-                    // Row 1: Yes/No sample
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(sampleYesNo.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            HabitCell(
-                                habit = sampleYesNo,
-                                date = LocalDate.now(),
-                                value = 1f,
-                                isToday = false,
-                                settings = settings,
-                                onClick = {},
-                                onLongClick = {}
-                            )
-                            HabitCell(
-                                habit = sampleYesNo,
-                                date = LocalDate.now().minusDays(1),
-                                value = 0f,
-                                isToday = false,
-                                settings = settings,
-                                onClick = {},
-                                onLongClick = {}
-                            )
+                    HabitRow(
+                        habit = sampleCount,
+                        weekDays = previewWeekDays,
+                        today = previewToday,
+                        entryMap = previewEntryMap,
+                        streak = 12,
+                        settings = settings,
+                        isReorderMode = false,
+                        onMoveUp = {},
+                        onMoveDown = {},
+                        onHabitClick = {},
+                        onEditHabit = {},
+                        onCellClick = { date ->
+                            val key = "992_${DateUtils.toDateString(date)}"
+                            val cur = previewValues[key] ?: 0f
+                            previewValues[key] = if (cur >= 9f) 0f else cur + 1f
+                        },
+                        onCellLongClick = { date ->
+                            val key = "992_${DateUtils.toDateString(date)}"
+                            previewValues[key] = 0f
                         }
-                    }
+                    )
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Row 2: Count sample
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(sampleCount.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            HabitCell(
-                                habit = sampleCount,
-                                date = LocalDate.now(),
-                                value = 5f, // partial
-                                isToday = true,
-                                settings = settings,
-                                onClick = {},
-                                onLongClick = {}
-                            )
-                            HabitCell(
-                                habit = sampleCount,
-                                date = LocalDate.now().minusDays(1),
-                                value = 8f, // completed
-                                isToday = false,
-                                settings = settings,
-                                onClick = {},
-                                onLongClick = {}
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Divider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
                 }
             }
 
             // Section: Theme & Theme Mode
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -601,7 +649,9 @@ fun SettingsScreen(
 
             // Section: Table & Cell Style
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -678,7 +728,9 @@ fun SettingsScreen(
 
             // Section: Calendar & Charts Preferences
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -753,7 +805,9 @@ fun SettingsScreen(
 
             // Section: Notifications & Reminders
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -789,7 +843,9 @@ fun SettingsScreen(
 
             // Section: Backup & Export
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
@@ -845,7 +901,9 @@ fun SettingsScreen(
 
             // Section: Sample Data & Reset
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 val hasSampleData = habits.any { it.uuid.startsWith("sample-habit-") && !it.isDeleted }

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF8A4C" />
+      <stop offset="100%" stop-color="#E0442B" />
+    </linearGradient>
+  </defs>
+
+  <!-- Diagonal gradient background -->
+  <rect width="512" height="512" fill="url(#bgGradient)" />
+
+  <!-- 75% circular progress ring (clockwise from 12 o'clock to 9 o'clock) -->
+  <path
+      d="M 256 92 A 164 164 0 1 1 92 256"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="50"
+      stroke-linecap="round"
+      stroke-linejoin="round" />
+
+  <!-- Centered bold checkmark -->
+  <path
+      d="M 187 256 L 233 302 L 325 210"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="50"
+      stroke-linecap="round"
+      stroke-linejoin="round" />
+</svg>
